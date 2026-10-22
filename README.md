@@ -53,7 +53,7 @@ backend/src/
 
 - Node.js compatible con las versiones de dependencias del proyecto.
 - MySQL/MariaDB y la base `turismo_ia`.
-- Clave opcional `GEMINI_API_KEY` en `backend/.env`; la búsqueda usa reglas locales si falta. `VITE_API_URL` puede definir el origen del backend (por defecto `http://localhost:3000`). No publiques secretos.
+- Clave opcional `GEMINI_API_KEY` en `backend/.env`; las llamadas a Gemini tienen un límite de 5 segundos y no se reintentan, tras el cual la búsqueda usa reglas locales. Si falta la clave, se usan las reglas locales directamente. `VITE_API_URL` puede definir el origen del backend (por defecto `http://localhost:3000`). No publiques secretos.
 
 ## Base de datos
 
