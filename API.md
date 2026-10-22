@@ -64,6 +64,15 @@ fetch("http://localhost:3000/auth/login", {
 
 Para cerrar sesión: `POST /auth/logout`. Para cambiar la contraseña mediante `PATCH /usuarios/me`, envía solo los campos que quieras actualizar; no están permitidos `identificacion` ni `rol`.
 
+### Consultas administrativas de usuarios
+
+Todas requieren sesión de administrador. La respuesta solo contiene datos públicos; nunca devuelve contraseña ni hash.
+
+| Método | Ruta | Función |
+|---|---|---|
+| `GET` | `/usuarios?busqueda=ana` | Buscar por nombre completo, correo o identificación; sin `busqueda`, listar todos |
+| `GET` | `/usuarios/:identificacion` | Consultar el perfil de una cuenta; devuelve `404` si no existe |
+
 ## Búsqueda y sitios turísticos
 
 | Método | Ruta | Acceso | Función |

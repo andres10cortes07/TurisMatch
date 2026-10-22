@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import "./App.css";
+import AdminDashboard from "./components/AdminDashboard";
 import AuthPage from "./components/AuthPage";
 
 export interface Lugar {
@@ -183,7 +184,7 @@ function App() {
   const [user, setUser] = useState<Usuario | null>(null);
   const [authMode, setAuthMode] = useState<"login" | "register" | null>(null);
   const [page, setPage] = useState<
-    "explore" | "recommended" | "favorites" | "preferences"
+    "explore" | "recommended" | "favorites" | "preferences" | "admin"
   >("explore");
   const [favorites, setFavorites] = useState<Favorito[]>([]);
   const [preferences, setPreferences] = useState<Preferencia[]>([]);
@@ -233,6 +234,7 @@ function App() {
         if (active) {
           setCategories(categoryList);
           setUser(currentUser);
+          if (currentUser?.rol === "administrador") setPage("admin");
           if (currentUser) {
             Promise.all([
               apiRequest<Favorito[]>("/favoritos"),
@@ -564,6 +566,7 @@ function App() {
 
   const handleAuth = async (nextUser: Usuario) => {
     setUser(nextUser);
+    setPage(nextUser.rol === "administrador" ? "admin" : "explore");
     setAuthMode(null);
     setNotice(`¡Qué bueno verte, ${nextUser.nombres}!`);
     await loadPersonalData();
@@ -600,6 +603,7 @@ function App() {
 
   const isFavorite = (placeId: number) =>
     favorites.some((favorite) => favorite.sitio.id === placeId);
+  const isAdmin = user?.rol === "administrador";
 
   return (
     <div className="app-shell">
@@ -618,41 +622,54 @@ function App() {
         </button>
 
         <nav className="main-nav" aria-label="Navegación principal">
-          <button
-            className={page === "explore" ? "active" : ""}
-            onClick={showExplore}
-            type="button"
-            title="Ver todos los sitios y aplicar filtros"
-            aria-pressed={page === "explore"}
-          >
-            Explorar
-          </button>
-          <button
-            className={page === "recommended" ? "active" : ""}
-            onClick={showRecommendations}
-            type="button"
-            title="Ver sitios según tus preferencias guardadas"
-            aria-pressed={page === "recommended"}
-          >
-            Para ti
-          </button>
-          <button
-            className={page === "favorites" ? "active" : ""}
-            onClick={() => setPage("favorites")}
-            type="button"
-          >
-            Favoritos <span className="nav-count">{favorites.length || ""}</span>
-          </button>
+          {isAdmin ? (
+            <>
+              <button className={page === "admin" ? "active" : ""} onClick={() => setPage("admin")} type="button" aria-pressed={page === "admin"}>
+                Panel administrador
+              </button>
+              <button className={page === "explore" ? "active" : ""} onClick={showExplore} type="button">
+                Vista turista
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                className={page === "explore" ? "active" : ""}
+                onClick={showExplore}
+                type="button"
+                title="Ver todos los sitios y aplicar filtros"
+                aria-pressed={page === "explore"}
+              >
+                Explorar
+              </button>
+              <button
+                className={page === "recommended" ? "active" : ""}
+                onClick={showRecommendations}
+                type="button"
+                title="Ver sitios según tus preferencias guardadas"
+                aria-pressed={page === "recommended"}
+              >
+                Para ti
+              </button>
+              <button
+                className={page === "favorites" ? "active" : ""}
+                onClick={() => setPage("favorites")}
+                type="button"
+              >
+                Favoritos <span className="nav-count">{favorites.length || ""}</span>
+              </button>
+            </>
+          )}
         </nav>
 
         <div className="header-actions">
-          <button
+          {!isAdmin && <button
             className={`preference-button ${page === "preferences" ? "selected" : ""}`}
             onClick={() => setPage("preferences")}
             type="button"
           >
             ✧ Mis preferencias
-          </button>
+          </button>}
           {user ? (
             <div className="account-menu">
               <span className="account-avatar" aria-hidden="true">
@@ -676,6 +693,14 @@ function App() {
       </header>
 
       <main>
+        {page === "admin" && isAdmin && <AdminDashboard request={apiRequest} />}
+        {page === "admin" && !isAdmin && (
+          <section className="personal-page">
+            <span className="eyebrow">ACCESO RESTRINGIDO</span>
+            <h1>Panel de administración</h1>
+            <p className="personal-intro">Esta sección está disponible únicamente para cuentas administradoras.</p>
+          </section>
+        )}
         {page === "recommended" && (
           <section className="personal-page recommendation-page">
             <span className="eyebrow">RECOMENDACIONES PERSONALIZADAS</span>

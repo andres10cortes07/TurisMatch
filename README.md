@@ -10,6 +10,7 @@ Aplicación web para explorar sitios turísticos de Colombia mediante filtros y 
 - [x] Formularios de inicio de sesión y registro conectados con las rutas de autenticación.
 - [x] Vistas de favoritos y preferencias personales conectadas con la cuenta autenticada.
 - [x] Vista “Para ti” filtrada por intereses guardados y ordenada por nivel de afinidad.
+- [x] Panel de administración protegido por rol con resumen, gestión de sitios/categorías/planes/preferencias y consulta de usuarios.
 - [x] Detalle de sitios con planes, calificaciones y publicación de opiniones.
 - [x] Backend NestJS con búsqueda de lugares y búsqueda inteligente con Gemini/fallback local.
 - [x] Esquema original de TurisMatch conservado; `/sitios` es el único recurso público de destinos y `vista_lugares_backend` adapta sus datos para la búsqueda.
