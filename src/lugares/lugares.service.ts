@@ -20,6 +20,15 @@ export class LugaresService {
     });
   }
 
+  async obtenerCiudades(): Promise<string[]> {
+    const rows = await this.lugaresRepository
+      .createQueryBuilder('lugar')
+      .select('DISTINCT lugar.ciudad', 'ciudad')
+      .getRawMany<{ ciudad: string }>();
+
+    return rows.map((row) => row.ciudad).filter(Boolean);
+  }
+
   // Buscar lugares por ciudad
   async buscarPorCiudad(ciudad: string): Promise<Lugar[]> {
     return this.lugaresRepository

@@ -181,8 +181,24 @@ export class AuthService {
     return usuarioPublico(await this.users.save(user));
   }
 
-  async listUsers(): Promise<UsuarioPublico[]> {
-    const users = await this.users.find({ order: { fechaRegistro: 'DESC' } });
+  async listUsers(search?: string): Promise<UsuarioPublico[]> {
+    const query = this.users.createQueryBuilder('usuario');
+    if (search?.trim()) {
+      query.where(
+        `LOWER(CONCAT(usuario.nombres, ' ', usuario.apellidos)) LIKE LOWER(:search)
+          OR LOWER(usuario.correo) LIKE LOWER(:search)
+          OR LOWER(usuario.identificacion) LIKE LOWER(:search)`,
+        { search: `%${search.trim()}%` },
+      );
+    }
+    const users = await query
+      .orderBy('usuario.fechaRegistro', 'DESC')
+      .getMany();
     return users.map(usuarioPublico);
+  }
+
+  async findUser(identificacion: string): Promise<UsuarioPublico | null> {
+    const user = await this.users.findOne({ where: { identificacion } });
+    return user ? usuarioPublico(user) : null;
   }
 }

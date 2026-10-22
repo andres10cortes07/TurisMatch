@@ -17,6 +17,13 @@ export interface FiltrosIA {
   precioMaximo: number | null;
 }
 
+export type FiltrosManuales = Partial<{
+  ciudad: string;
+  categoria: string;
+  calificacionMinima: number;
+  precioMaximo: number;
+}>;
+
 @Injectable()
 export class AiService {
   private readonly gemini: GoogleGenAI;
@@ -48,7 +55,10 @@ export class AiService {
   }
 
   // Interpreta consultas sin depender de un servicio externo.
-  private interpretarConsultaLocal(query: string): FiltrosIA {
+  private interpretarConsultaLocal(
+    query: string,
+    ciudadesDisponibles: string[] = [],
+  ): FiltrosIA {
     const texto = this.normalizar(query);
 
     let ciudad: string | null = null;
@@ -68,7 +78,15 @@ export class AiService {
       { nombre: 'San Andrés', palabras: ['san andres'] },
       { nombre: 'Pereira', palabras: ['pereira'] },
       { nombre: 'Bucaramanga', palabras: ['bucaramanga'] },
-    ];
+      ...ciudadesDisponibles.map((nombre) => ({
+        nombre,
+        palabras: [this.normalizar(nombre)],
+      })),
+    ].sort(
+      (left, right) =>
+        Math.max(...right.palabras.map((word) => word.length)) -
+        Math.max(...left.palabras.map((word) => word.length)),
+    );
 
     for (const item of ciudades) {
       if (item.palabras.some((palabra) => texto.includes(palabra))) {
@@ -168,6 +186,8 @@ Devuelve exclusivamente un JSON con estas propiedades:
 - precioMaximo: precio máximo en pesos colombianos o null.
 
 Reglas:
+- Extrae ciudades aunque aparezcan dentro de frases, por ejemplo "conocer Tunja".
+- Infiere una categoría solo cuando la actividad la indique claramente; viajar en pareja por sí solo no define una categoría.
 - Si dice gratis, gratuito o sin costo, precioMaximo debe ser 0.
 - Si dice más de 4 estrellas o superior a 4 estrellas,
   calificacionMinima debe ser 4.
@@ -251,7 +271,10 @@ Reglas:
     return filtros;
   }
 
-  async processQuery(query: string): Promise<{
+  async processQuery(
+    query: string,
+    filtrosManuales: FiltrosManuales = {},
+  ): Promise<{
     consulta: string;
     modo: string;
     filtros: FiltrosIA;
@@ -263,6 +286,37 @@ Reglas:
     if (!query?.trim()) {
       throw new BadRequestException(
         'Debes escribir una consulta turística.',
+      );
+    }
+    if (
+      filtrosManuales.ciudad !== undefined &&
+      typeof filtrosManuales.ciudad !== 'string'
+    ) {
+      throw new BadRequestException('La ciudad indicada no es válida.');
+    }
+    if (
+      filtrosManuales.categoria !== undefined &&
+      typeof filtrosManuales.categoria !== 'string'
+    ) {
+      throw new BadRequestException('La categoría indicada no es válida.');
+    }
+    if (
+      filtrosManuales.calificacionMinima !== undefined &&
+      (!Number.isFinite(filtrosManuales.calificacionMinima) ||
+        filtrosManuales.calificacionMinima < 0 ||
+        filtrosManuales.calificacionMinima > 5)
+    ) {
+      throw new BadRequestException(
+        'La calificación mínima debe estar entre 0 y 5.',
+      );
+    }
+    if (
+      filtrosManuales.precioMaximo !== undefined &&
+      (!Number.isFinite(filtrosManuales.precioMaximo) ||
+        filtrosManuales.precioMaximo < 0)
+    ) {
+      throw new BadRequestException(
+        'El precio máximo debe ser mayor o igual a cero.',
       );
     }
 
@@ -279,24 +333,40 @@ Reglas:
         error instanceof Error ? error.message : error,
       );
 
-      filtros = this.interpretarConsultaLocal(query.trim());
+      const ciudadesDisponibles =
+        await this.lugaresService.obtenerCiudades();
+      filtros = this.interpretarConsultaLocal(
+        query.trim(),
+        ciudadesDisponibles,
+      );
       modo = 'reglas-locales';
 
       console.log('Filtros interpretados localmente:', filtros);
     }
 
+    const filtrosAplicados: FiltrosIA = {
+      ciudad:
+        filtrosManuales.ciudad?.trim() || filtros.ciudad,
+      categoria:
+        filtrosManuales.categoria?.trim() || filtros.categoria,
+      calificacionMinima:
+        filtrosManuales.calificacionMinima ?? filtros.calificacionMinima,
+      precioMaximo:
+        filtrosManuales.precioMaximo ?? filtros.precioMaximo,
+    };
+
     try {
       const lugares = await this.lugaresService.buscarConFiltros(
-        filtros.ciudad ?? undefined,
-        filtros.categoria ?? undefined,
-        filtros.calificacionMinima ?? undefined,
-        filtros.precioMaximo ?? undefined,
+        filtrosAplicados.ciudad ?? undefined,
+        filtrosAplicados.categoria ?? undefined,
+        filtrosAplicados.calificacionMinima ?? undefined,
+        filtrosAplicados.precioMaximo ?? undefined,
       );
 
       return {
         consulta: query.trim(),
         modo,
-        filtros,
+        filtros: filtrosAplicados,
         cantidad: lugares.length,
         lugares,
       };

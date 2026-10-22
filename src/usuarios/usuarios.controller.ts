@@ -2,7 +2,10 @@ import {
   Body,
   Controller,
   Get,
+  NotFoundException,
   Patch,
+  Param,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -36,7 +39,16 @@ export class UsuariosController {
   @Get()
   @UseGuards(RolesGuard)
   @Roles('administrador')
-  list() {
-    return this.authService.listUsers();
+  list(@Query('busqueda') search?: string) {
+    return this.authService.listUsers(search);
+  }
+
+  @Get(':identificacion')
+  @UseGuards(RolesGuard)
+  @Roles('administrador')
+  async get(@Param('identificacion') identificacion: string) {
+    const user = await this.authService.findUser(identificacion);
+    if (!user) throw new NotFoundException('El usuario no existe.');
+    return user;
   }
 }
