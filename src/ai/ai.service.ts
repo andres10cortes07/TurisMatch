@@ -213,6 +213,9 @@ Reglas:
           ],
         },
       },
+    }, {
+      timeout_ms: 5_000,
+      retries: { strategy: 'none' },
     });
 
     const contenido = respuesta.output_text;
