@@ -388,7 +388,18 @@ function App() {
 
   const handleSearch = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!query.trim()) return;
+    if (!query.trim()) {
+      setPage("explore");
+      setAiSearch(null);
+      if (aiResults) {
+        setAiResults(false);
+      } else {
+        setLoading(true);
+        await loadPlaces();
+      }
+      document.getElementById("experiencias")?.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
     setLoading(true);
     setError("");
     setAiResults(true);
@@ -955,7 +966,7 @@ function App() {
                     aria-label="Describe la experiencia que buscas"
                   />
                   <span className="search-hint">
-                    Describe el destino o plan; los filtros de abajo se combinan con tu frase.
+                    Describe un plan para buscar con IA o deja el campo vacío y aplica los filtros.
                   </span>
                 </span>
               </label>
@@ -1043,8 +1054,8 @@ function App() {
                   </select>
                 </span>
               </label>
-              <button className="search-submit" type="submit" disabled={!query.trim() || loading}>
-                <span>⌕</span> Buscar con IA
+              <button className="search-submit" type="submit" disabled={loading}>
+                <span>⌕</span> {query.trim() ? "Buscar con IA" : "Aplicar filtros"}
               </button>
                 </form>
 
