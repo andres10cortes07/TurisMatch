@@ -184,7 +184,7 @@ function App() {
   const [user, setUser] = useState<Usuario | null>(null);
   const [authMode, setAuthMode] = useState<"login" | "register" | null>(null);
   const [page, setPage] = useState<
-    "explore" | "recommended" | "favorites" | "preferences" | "admin"
+    "explore" | "recommended" | "favorites" | "preferences" | "account" | "admin"
   >("explore");
   const [favorites, setFavorites] = useState<Favorito[]>([]);
   const [preferences, setPreferences] = useState<Preferencia[]>([]);
@@ -194,6 +194,15 @@ function App() {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
   const [notice, setNotice] = useState("");
+  const [profileForm, setProfileForm] = useState({
+    nombres: "",
+    apellidos: "",
+    correo: "",
+    contrasenaActual: "",
+    contrasena: "",
+    confirmarContrasena: "",
+  });
+  const [savingProfile, setSavingProfile] = useState(false);
 
   const loadPlaces = useCallback(async () => {
     try {
@@ -572,6 +581,70 @@ function App() {
     await loadPersonalData();
   };
 
+  const openAccount = () => {
+    if (!user) return;
+    setProfileForm({
+      nombres: user.nombres,
+      apellidos: user.apellidos,
+      correo: user.correo,
+      contrasenaActual: "",
+      contrasena: "",
+      confirmarContrasena: "",
+    });
+    setError("");
+    setNotice("");
+    setPage("account");
+  };
+
+  const saveProfile = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!user) return;
+    if (profileForm.contrasena && profileForm.contrasena !== profileForm.confirmarContrasena) {
+      setError("La nueva contraseña y su confirmación no coinciden.");
+      return;
+    }
+    if (!profileForm.contrasena && (profileForm.contrasenaActual || profileForm.confirmarContrasena)) {
+      setError("Completa la nueva contraseña y su confirmación para cambiarla.");
+      return;
+    }
+
+    const payload: Record<string, string> = {
+      nombres: profileForm.nombres,
+      apellidos: profileForm.apellidos,
+      correo: profileForm.correo,
+    };
+    if (profileForm.contrasena) {
+      payload.contrasenaActual = profileForm.contrasenaActual;
+      payload.contrasena = profileForm.contrasena;
+    }
+
+    setSavingProfile(true);
+    setError("");
+    setNotice("");
+    try {
+      const updatedUser = await apiRequest<Usuario>("/usuarios/me", {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+      setUser(updatedUser);
+      setProfileForm((current) => ({
+        ...current,
+        contrasenaActual: "",
+        contrasena: "",
+        confirmarContrasena: "",
+      }));
+      setNotice("Tus datos se actualizaron correctamente.");
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudieron actualizar tus datos.",
+      );
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
   const signOut = async () => {
     try {
       await apiRequest("/auth/logout", { method: "POST" });
@@ -676,6 +749,9 @@ function App() {
                 {user.nombres.slice(0, 1).toUpperCase()}
               </span>
               <span className="account-name">{user.nombres}</span>
+              <button className="account-link" type="button" onClick={openAccount} aria-current={page === "account" ? "page" : undefined}>
+                Mi cuenta
+              </button>
               <button className="logout-button" type="button" onClick={() => void signOut()}>
                 <span aria-hidden="true">↪</span> Cerrar sesión
               </button>
@@ -699,6 +775,63 @@ function App() {
             <span className="eyebrow">ACCESO RESTRINGIDO</span>
             <h1>Panel de administración</h1>
             <p className="personal-intro">Esta sección está disponible únicamente para cuentas administradoras.</p>
+          </section>
+        )}
+        {page === "account" && (
+          <section className="personal-page account-page">
+            <span className="eyebrow">TU PERFIL</span>
+            <h1>Mi cuenta</h1>
+            <p className="personal-intro">Actualiza tus datos básicos y mantén segura tu contraseña.</p>
+            {error && <p className="notice error-notice" role="alert">{error}</p>}
+            {notice && <p className="notice success-notice" role="status">{notice}</p>}
+            {user ? (
+              <form className="profile-form" onSubmit={(event) => void saveProfile(event)}>
+                <div className="profile-form-section">
+                  <h2>Datos personales</h2>
+                  <div className="profile-form-grid">
+                    <label className="admin-form-field">
+                      <span>Nombres <b>*</b></span>
+                      <input required maxLength={100} value={profileForm.nombres} onChange={(event) => setProfileForm((current) => ({ ...current, nombres: event.target.value }))} />
+                    </label>
+                    <label className="admin-form-field">
+                      <span>Apellidos <b>*</b></span>
+                      <input required maxLength={100} value={profileForm.apellidos} onChange={(event) => setProfileForm((current) => ({ ...current, apellidos: event.target.value }))} />
+                    </label>
+                    <label className="admin-form-field profile-field-wide">
+                      <span>Correo electrónico <b>*</b></span>
+                      <input required maxLength={150} type="email" autoComplete="email" value={profileForm.correo} onChange={(event) => setProfileForm((current) => ({ ...current, correo: event.target.value }))} />
+                    </label>
+                  </div>
+                </div>
+                <div className="profile-form-section">
+                  <h2>Cambiar contraseña</h2>
+                  <p>Déjalo en blanco si no necesitas cambiarla. Por seguridad, te pediremos tu contraseña actual.</p>
+                  <div className="profile-form-grid">
+                    <label className="admin-form-field">
+                      <span>Contraseña actual</span>
+                      <input type="password" autoComplete="current-password" required={!!profileForm.contrasena} value={profileForm.contrasenaActual} onChange={(event) => setProfileForm((current) => ({ ...current, contrasenaActual: event.target.value }))} />
+                    </label>
+                    <label className="admin-form-field">
+                      <span>Nueva contraseña</span>
+                      <input type="password" autoComplete="new-password" minLength={8} maxLength={128} pattern="(?=.*[A-Za-z])(?=.*[0-9]).{8,128}" value={profileForm.contrasena} onChange={(event) => setProfileForm((current) => ({ ...current, contrasena: event.target.value }))} />
+                    </label>
+                    <label className="admin-form-field">
+                      <span>Confirmar nueva contraseña</span>
+                      <input type="password" autoComplete="new-password" minLength={8} maxLength={128} required={!!profileForm.contrasena} value={profileForm.confirmarContrasena} onChange={(event) => setProfileForm((current) => ({ ...current, confirmarContrasena: event.target.value }))} />
+                    </label>
+                  </div>
+                  <p className="profile-password-hint">Debe tener entre 8 y 128 caracteres e incluir al menos una letra y un número.</p>
+                </div>
+                <div className="profile-form-actions">
+                  <button className="primary-button" type="submit" disabled={savingProfile}>{savingProfile ? "Guardando..." : "Guardar cambios"}</button>
+                </div>
+              </form>
+            ) : (
+              <div className="empty-state">
+                <span>♙</span><h3>Inicia sesión para gestionar tu cuenta</h3>
+                <button className="primary-button" type="button" onClick={() => setAuthMode("login")}>Iniciar sesión</button>
+              </div>
+            )}
           </section>
         )}
         {page === "recommended" && (

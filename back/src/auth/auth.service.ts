@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   UnauthorizedException,
@@ -54,6 +55,32 @@ export class AuthService {
   ) {}
 
   async register(input: unknown): Promise<UsuarioPublico> {
+    return this.createUser(input, 'turista');
+  }
+
+  async createManagedUser(input: unknown): Promise<UsuarioPublico> {
+    const body = requireObject(input);
+    assertAllowedKeys(body, [
+      'identificacion',
+      'tipoDoc',
+      'nombres',
+      'apellidos',
+      'correo',
+      'fechaNacimiento',
+      'contrasena',
+      'rol',
+    ]);
+    if (body.rol !== 'administrador' && body.rol !== 'turista') {
+      throw new BadRequestException('El rol seleccionado no es válido.');
+    }
+    const { rol, ...userInput } = body;
+    return this.createUser(userInput, rol);
+  }
+
+  private async createUser(
+    input: unknown,
+    rol: RolUsuario,
+  ): Promise<UsuarioPublico> {
     const body = requireObject(input);
     assertAllowedKeys(body, [
       'identificacion',
@@ -96,7 +123,7 @@ export class AuthService {
       correo,
       fechaNacimiento,
       contrasena: await hashPassword(contrasena),
-      rol: 'turista',
+      rol,
       fechaRegistro: new Date(),
     });
     return usuarioPublico(await this.users.save(user));
@@ -146,9 +173,102 @@ export class AuthService {
       'correo',
       'fechaNacimiento',
       'contrasena',
+      'contrasenaActual',
     ]);
 
-    const user = await this.users.findOne({ where: { identificacion } });
+    const query = this.users
+      .createQueryBuilder('usuario')
+      .where('usuario.identificacion = :identificacion', { identificacion });
+    if (body.contrasena !== undefined) {
+      query.addSelect('usuario.contrasena');
+    }
+    const user = await query.getOne();
+    if (!user) throw new UnauthorizedException('La cuenta ya no existe.');
+
+    if (body.tipoDoc !== undefined) {
+      user.tipoDoc = requireText(body.tipoDoc, 'El tipo de documento', 20);
+    }
+    if (body.nombres !== undefined) {
+      user.nombres = requireText(body.nombres, 'Los nombres', 100);
+    }
+    if (body.apellidos !== undefined) {
+      user.apellidos = requireText(body.apellidos, 'Los apellidos', 100);
+    }
+    if (body.fechaNacimiento !== undefined) {
+      user.fechaNacimiento = requireDate(
+        body.fechaNacimiento,
+        'La fecha de nacimiento',
+      );
+    }
+    if (body.correo !== undefined) {
+      const correo = requireEmail(body.correo);
+      const existing = await this.users.findOne({ where: { correo } });
+      if (existing && existing.identificacion !== identificacion) {
+        throw new ConflictException('Ese correo ya está registrado.');
+      }
+      user.correo = correo;
+    }
+    if (body.contrasena !== undefined) {
+      if (
+        typeof body.contrasenaActual !== 'string' ||
+        !body.contrasenaActual ||
+        !(await verifyPassword(body.contrasenaActual, user.contrasena))
+      ) {
+        throw new UnauthorizedException(
+          'La contraseña actual no es correcta.',
+        );
+      }
+      user.contrasena = await hashPassword(validatePassword(body.contrasena));
+    } else if (body.contrasenaActual !== undefined) {
+      throw new BadRequestException(
+        'La contraseña actual solo se envía para cambiar la contraseña.',
+      );
+    }
+
+    return usuarioPublico(await this.users.save(user));
+  }
+
+  async updateManagedUser(
+    identificacion: string,
+    input: unknown,
+    requestingUserId: string,
+  ): Promise<UsuarioPublico> {
+    const body = requireObject(input);
+    assertAllowedKeys(body, [
+      'tipoDoc',
+      'nombres',
+      'apellidos',
+      'correo',
+      'fechaNacimiento',
+      'contrasena',
+      'rol',
+    ]);
+    if (Object.keys(body).length === 0) {
+      throw new BadRequestException('Indica al menos un dato para actualizar.');
+    }
+    if (
+      body.rol !== undefined &&
+      body.rol !== 'administrador' &&
+      body.rol !== 'turista'
+    ) {
+      throw new BadRequestException('El rol seleccionado no es válido.');
+    }
+    if (
+      identificacion === requestingUserId &&
+      body.rol === 'turista'
+    ) {
+      throw new BadRequestException(
+        'No puedes quitarte a ti mismo el rol de administrador.',
+      );
+    }
+
+    const query = this.users
+      .createQueryBuilder('usuario')
+      .where('usuario.identificacion = :identificacion', { identificacion });
+    if (body.contrasena !== undefined) {
+      query.addSelect('usuario.contrasena');
+    }
+    const user = await query.getOne();
     if (!user) throw new UnauthorizedException('La cuenta ya no existe.');
 
     if (body.tipoDoc !== undefined) {
@@ -176,6 +296,9 @@ export class AuthService {
     }
     if (body.contrasena !== undefined) {
       user.contrasena = await hashPassword(validatePassword(body.contrasena));
+    }
+    if (body.rol !== undefined) {
+      user.rol = body.rol;
     }
 
     return usuarioPublico(await this.users.save(user));

@@ -51,6 +51,12 @@ interface Usuario {
   fechaRegistro: string;
 }
 
+type RolUsuario = "administrador" | "turista";
+type FormularioUsuario = Pick<
+  Usuario,
+  "tipoDoc" | "nombres" | "apellidos" | "correo" | "fechaNacimiento"
+> & { rol: RolUsuario; contrasena: string };
+
 interface AdminApi {
   <T>(path: string, options?: RequestInit): Promise<T>;
 }
@@ -157,6 +163,18 @@ function AdminDashboard({ request }: Props) {
   const [form, setForm] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [selectedUser, setSelectedUser] = useState<Usuario | null>(null);
+  const [userForm, setUserForm] = useState<FormularioUsuario | null>(null);
+  const [adminCreationOpen, setAdminCreationOpen] = useState(false);
+  const [adminForm, setAdminForm] = useState({
+    rol: "turista" as RolUsuario,
+    identificacion: "",
+    tipoDoc: "CC",
+    nombres: "",
+    apellidos: "",
+    correo: "",
+    fechaNacimiento: "",
+    contrasena: "",
+  });
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -214,15 +232,105 @@ function AdminDashboard({ request }: Props) {
   const viewUser = async (identificacion: string) => {
     setError("");
     try {
-      setSelectedUser(
-        await request<Usuario>(`/usuarios/${encodeURIComponent(identificacion)}`),
+      const user = await request<Usuario>(
+        `/usuarios/${encodeURIComponent(identificacion)}`,
       );
+      setUserForm({
+        tipoDoc: user.tipoDoc,
+        nombres: user.nombres,
+        apellidos: user.apellidos,
+        correo: user.correo,
+        fechaNacimiento: user.fechaNacimiento.slice(0, 10),
+        rol: user.rol === "administrador" ? "administrador" : "turista",
+        contrasena: "",
+      });
+      setSelectedUser(user);
     } catch (lookupError) {
       setError(
         lookupError instanceof Error
           ? lookupError.message
           : "No se pudo consultar el usuario.",
       );
+    }
+  };
+
+  const updateUser = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedUser || !userForm) return;
+    const payload: Record<string, string> = {
+      tipoDoc: userForm.tipoDoc,
+      nombres: userForm.nombres,
+      apellidos: userForm.apellidos,
+      correo: userForm.correo,
+      fechaNacimiento: userForm.fechaNacimiento,
+      rol: userForm.rol,
+    };
+    if (userForm.contrasena) payload.contrasena = userForm.contrasena;
+
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const updatedUser = await request<Usuario>(
+        `/usuarios/${encodeURIComponent(selectedUser.identificacion)}`,
+        { method: "PATCH", body: JSON.stringify(payload) },
+      );
+      setUsers((current) =>
+        current.map((user) =>
+          user.identificacion === updatedUser.identificacion
+            ? updatedUser
+            : user,
+        ),
+      );
+      setSelectedUser(null);
+      setUserForm(null);
+      setNotice("Los datos del usuario se actualizaron correctamente.");
+    } catch (updateError) {
+      setError(
+        updateError instanceof Error
+          ? updateError.message
+          : "No se pudieron actualizar los datos del usuario.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const createUser = async (
+    event: React.FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      await request<Usuario>("/usuarios", {
+        method: "POST",
+        body: JSON.stringify(adminForm),
+      });
+      setAdminCreationOpen(false);
+      setAdminForm({
+        rol: "turista",
+        identificacion: "",
+        tipoDoc: "CC",
+        nombres: "",
+        apellidos: "",
+        correo: "",
+        fechaNacimiento: "",
+        contrasena: "",
+      });
+      await loadData();
+      setNotice(
+        `Cuenta de ${adminForm.rol === "administrador" ? "administrador" : "turista"} creada correctamente.`,
+      );
+    } catch (creationError) {
+      setError(
+        creationError instanceof Error
+          ? creationError.message
+          : "No se pudo crear la cuenta.",
+      );
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -391,6 +499,10 @@ function AdminDashboard({ request }: Props) {
                 ? "Un vistazo a los destinos y contenidos de tu plataforma."
                 : section === "usuarios"
                   ? "Consulta las cuentas registradas en TurisMatch."
+                  : section === "categorias"
+                    ? "Las categorías se asignan a los sitios turísticos para clasificarlos."
+                    : section === "preferencias"
+                      ? "Las preferencias se relacionan con cada usuario y sirven para personalizar sus recomendaciones."
                   : `Administra ${labels[section].toLocaleLowerCase("es-CO")} y mantenlos al día.`}
             </p>
           </div>
@@ -449,11 +561,24 @@ function AdminDashboard({ request }: Props) {
         ) : section === "usuarios" ? (
           <section className="admin-panel-card admin-table-panel">
             <div className="admin-card-heading">
-              <div><h2>Cuentas registradas</h2><p>{usersTotal} usuarios en total · Consulta de solo lectura</p></div>
-              <form className="admin-user-search-form" onSubmit={(event) => void searchUsers(event)}>
-                <label className="admin-search">⌕ <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nombre, correo o documento" /></label>
-                <button className="admin-user-search-button" disabled={searchingUsers} type="submit">{searchingUsers ? "Buscando..." : "Buscar"}</button>
-              </form>
+              <div><h2>Cuentas registradas</h2><p>{usersTotal} usuarios en total · Solo administradores pueden crear cuentas.</p></div>
+              <div className="admin-user-actions">
+                <form className="admin-user-search-form" onSubmit={(event) => void searchUsers(event)}>
+                  <label className="admin-search">⌕ <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nombre, correo o documento" /></label>
+                  <button className="admin-user-search-button" disabled={searchingUsers} type="submit">{searchingUsers ? "Buscando..." : "Buscar"}</button>
+                </form>
+                <button
+                  className="admin-create-button"
+                  onClick={() => {
+                    setError("");
+                    setNotice("");
+                    setAdminCreationOpen(true);
+                  }}
+                  type="button"
+                >
+                  ＋ Crear usuario
+                </button>
+              </div>
             </div>
             <div className="admin-table-scroll">
               <table className="admin-table">
@@ -466,7 +591,7 @@ function AdminDashboard({ request }: Props) {
                       <td>{user.correo}</td>
                       <td><span className={`admin-role ${user.rol === "administrador" ? "admin" : ""}`}>{user.rol}</span></td>
                       <td>{new Date(user.fechaRegistro).toLocaleDateString("es-CO")}</td>
-                      <td><button className="admin-view-user" onClick={() => void viewUser(user.identificacion)} type="button">Consultar</button></td>
+                      <td><button className="admin-view-user" onClick={() => void viewUser(user.identificacion)} type="button">Editar</button></td>
                     </tr>
                   ))}
                   {!users.length && <tr><td className="admin-empty" colSpan={6}>No se encontraron usuarios.</td></tr>}
@@ -477,7 +602,14 @@ function AdminDashboard({ request }: Props) {
         ) : (
           <section className="admin-panel-card admin-table-panel">
             <div className="admin-card-heading">
-              <div><h2>{labels[section]} registrados</h2><p>{getSectionRecords().length} elementos · Los cambios se guardan en la base de datos.</p></div>
+              <div>
+                <h2>{labels[section]} registrados</h2>
+                <p>
+                  {getSectionRecords().length} elementos · Los cambios se guardan en la base de datos.
+                  {section === "categorias" && " Estas categorías se usan para clasificar los sitios turísticos."}
+                  {section === "preferencias" && " Estas preferencias se vinculan a los usuarios para generar recomendaciones personalizadas."}
+                </p>
+              </div>
               <button className="admin-create-button" onClick={startCreate} type="button">＋ Nuevo {section === "sitios" ? "sitio" : section === "categorias" ? "categoría" : section === "planes" ? "plan" : "preferencia"}</button>
             </div>
             <div className="admin-record-list">
@@ -545,22 +677,137 @@ function AdminDashboard({ request }: Props) {
       )}
       {selectedUser && (
         <div className="modal-backdrop admin-modal-backdrop" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) setSelectedUser(null);
+          if (event.target === event.currentTarget && !saving) {
+            setSelectedUser(null);
+            setUserForm(null);
+          }
         }}>
           <section aria-labelledby="admin-user-title" aria-modal="true" className="admin-editor admin-user-detail" role="dialog">
             <div className="admin-editor-heading">
-              <div><span className="eyebrow">DETALLE DE CUENTA</span><h2 id="admin-user-title">{selectedUser.nombres} {selectedUser.apellidos}</h2></div>
-              <button aria-label="Cerrar detalle" onClick={() => setSelectedUser(null)} type="button">×</button>
+              <div><span className="eyebrow">GESTIÓN DE CUENTAS</span><h2 id="admin-user-title">Editar usuario</h2></div>
+              <button aria-label="Cerrar edición" onClick={() => { setSelectedUser(null); setUserForm(null); }} type="button" disabled={saving}>×</button>
             </div>
-            <dl>
-              <div><dt>Identificación</dt><dd>{selectedUser.tipoDoc} · {selectedUser.identificacion}</dd></div>
-              <div><dt>Correo electrónico</dt><dd>{selectedUser.correo}</dd></div>
-              <div><dt>Fecha de nacimiento</dt><dd>{new Date(`${selectedUser.fechaNacimiento}T00:00:00`).toLocaleDateString("es-CO")}</dd></div>
-              <div><dt>Rol</dt><dd><span className={`admin-role ${selectedUser.rol === "administrador" ? "admin" : ""}`}>{selectedUser.rol}</span></dd></div>
-              <div><dt>Fecha de registro</dt><dd>{new Date(selectedUser.fechaRegistro).toLocaleDateString("es-CO")}</dd></div>
-            </dl>
-            <p>La información personal y el rol se muestran en modo de consulta; esta API no permite modificarlos desde el panel.</p>
-            <div className="admin-editor-actions"><button className="primary-button" onClick={() => setSelectedUser(null)} type="button">Cerrar</button></div>
+            {userForm && (
+              <form onSubmit={(event) => void updateUser(event)}>
+                <div className="admin-form-grid">
+                  <label className="admin-form-field">
+                    <span>Tipo de documento <b>*</b></span>
+                    <select required value={userForm.tipoDoc} onChange={(event) => setUserForm((current) => current ? { ...current, tipoDoc: event.target.value } : current)}>
+                      <option value="CC">Cédula de ciudadanía</option>
+                      <option value="CE">Cédula de extranjería</option>
+                      <option value="TI">Tarjeta de identidad</option>
+                      <option value="PP">Pasaporte</option>
+                    </select>
+                  </label>
+                  <label className="admin-form-field">
+                    <span>Número de documento</span>
+                    <input value={selectedUser.identificacion} disabled />
+                  </label>
+                  {([
+                    { key: "nombres", label: "Nombres", type: "text" },
+                    { key: "apellidos", label: "Apellidos", type: "text" },
+                    { key: "correo", label: "Correo electrónico", type: "email" },
+                    { key: "fechaNacimiento", label: "Fecha de nacimiento", type: "date" },
+                  ] as const).map((field) => (
+                    <label className="admin-form-field" key={field.key}>
+                      <span>{field.label} <b>*</b></span>
+                      <input
+                        required
+                        maxLength={field.key === "nombres" || field.key === "apellidos" ? 100 : undefined}
+                        type={field.type}
+                        value={userForm[field.key]}
+                        onChange={(event) => setUserForm((current) => current ? { ...current, [field.key]: event.target.value } : current)}
+                      />
+                    </label>
+                  ))}
+                  <label className="admin-form-field">
+                    <span>Rol <b>*</b></span>
+                    <select required value={userForm.rol} onChange={(event) => setUserForm((current) => current ? { ...current, rol: event.target.value === "administrador" ? "administrador" : "turista" } : current)}>
+                      <option value="turista">Turista</option>
+                      <option value="administrador">Administrador</option>
+                    </select>
+                  </label>
+                  <label className="admin-form-field">
+                    <span>Restablecer contraseña</span>
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      minLength={8}
+                      maxLength={128}
+                      pattern="(?=.*[A-Za-z])(?=.*[0-9]).{8,128}"
+                      value={userForm.contrasena}
+                      onChange={(event) => setUserForm((current) => current ? { ...current, contrasena: event.target.value } : current)}
+                    />
+                  </label>
+                </div>
+                <p className="admin-user-form-note">El documento no se puede cambiar. Deja la contraseña en blanco para conservarla; si la restableces, debe tener al menos 8 caracteres, una letra y un número.</p>
+                <div className="admin-editor-actions">
+                  <button className="secondary-button" onClick={() => { setSelectedUser(null); setUserForm(null); }} type="button" disabled={saving}>Cancelar</button>
+                  <button className="primary-button" type="submit" disabled={saving}>{saving ? "Guardando..." : "Guardar cambios"}</button>
+                </div>
+                {error && <p className="notice error-notice admin-editor-error" role="alert">{error}</p>}
+              </form>
+            )}
+          </section>
+        </div>
+      )}
+      {adminCreationOpen && (
+        <div className="modal-backdrop admin-modal-backdrop" onMouseDown={(event) => {
+          if (event.target === event.currentTarget && !saving) setAdminCreationOpen(false);
+        }}>
+          <section aria-labelledby="admin-create-user-title" aria-modal="true" className="admin-editor" role="dialog">
+            <div className="admin-editor-heading">
+              <div><span className="eyebrow">GESTIÓN DE CUENTAS</span><h2 id="admin-create-user-title">Crear usuario</h2></div>
+              <button aria-label="Cerrar formulario" onClick={() => setAdminCreationOpen(false)} type="button" disabled={saving}>×</button>
+            </div>
+            <form onSubmit={(event) => void createUser(event)}>
+              <div className="admin-form-grid">
+                <label className="admin-form-field">
+                  <span>Rol de la cuenta <b>*</b></span>
+                  <select required value={adminForm.rol} onChange={(event) => setAdminForm((current) => ({ ...current, rol: event.target.value === "administrador" ? "administrador" : "turista" }))}>
+                    <option value="turista">Turista</option>
+                    <option value="administrador">Administrador</option>
+                  </select>
+                </label>
+                <label className="admin-form-field">
+                  <span>Tipo de documento <b>*</b></span>
+                  <select required value={adminForm.tipoDoc} onChange={(event) => setAdminForm((current) => ({ ...current, tipoDoc: event.target.value }))}>
+                    <option value="CC">Cédula de ciudadanía</option>
+                    <option value="CE">Cédula de extranjería</option>
+                    <option value="TI">Tarjeta de identidad</option>
+                    <option value="PP">Pasaporte</option>
+                  </select>
+                </label>
+                {([
+                  { key: "identificacion", label: "Número de documento", type: "text" },
+                  { key: "nombres", label: "Nombres", type: "text" },
+                  { key: "apellidos", label: "Apellidos", type: "text" },
+                  { key: "correo", label: "Correo electrónico", type: "email" },
+                  { key: "fechaNacimiento", label: "Fecha de nacimiento", type: "date" },
+                  { key: "contrasena", label: "Contraseña temporal", type: "password" },
+                ] as const).map((field) => (
+                  <label className="admin-form-field" key={field.key}>
+                    <span>{field.label} <b>*</b></span>
+                    <input
+                      autoComplete={field.key === "contrasena" ? "new-password" : undefined}
+                      maxLength={field.key === "identificacion" ? 30 : undefined}
+                      minLength={field.key === "contrasena" ? 8 : undefined}
+                      pattern={field.key === "contrasena" ? "(?=.*[A-Za-z])(?=.*[0-9]).{8,128}" : undefined}
+                      required
+                      type={field.type}
+                      value={adminForm[field.key]}
+                      onChange={(event) => setAdminForm((current) => ({ ...current, [field.key]: event.target.value }))}
+                    />
+                  </label>
+                ))}
+              </div>
+              <p className="admin-user-form-note">La contraseña debe tener al menos 8 caracteres, una letra y un número. Compártela por un canal seguro.</p>
+              <div className="admin-editor-actions">
+                <button className="secondary-button" onClick={() => setAdminCreationOpen(false)} type="button" disabled={saving}>Cancelar</button>
+                <button className="primary-button" type="submit" disabled={saving}>{saving ? "Creando..." : "Crear usuario"}</button>
+              </div>
+              {error && <p className="notice error-notice admin-editor-error" role="alert">{error}</p>}
+            </form>
           </section>
         </div>
       )}

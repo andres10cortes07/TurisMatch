@@ -9,8 +9,9 @@ Aplicación web para explorar sitios turísticos de Colombia mediante filtros y 
 - [x] Frontend React + TypeScript con catálogo visual, filtros combinables y búsqueda en lenguaje natural; la búsqueda muestra los criterios interpretados y conserva los filtros elegidos.
 - [x] Formularios de inicio de sesión y registro conectados con las rutas de autenticación.
 - [x] Vistas de favoritos y preferencias personales conectadas con la cuenta autenticada.
+- [x] Página de cuenta para actualizar nombres, apellidos, correo y contraseña propia.
 - [x] Vista “Para ti” filtrada por intereses guardados y ordenada por nivel de afinidad.
-- [x] Panel de administración protegido por rol con resumen, gestión de sitios/categorías/planes/preferencias y consulta de usuarios.
+- [x] Panel de administración protegido por rol con resumen, gestión de sitios/categorías/planes/preferencias y consulta, creación y edición de turistas y administradores.
 - [x] Detalle de sitios con planes, calificaciones y publicación de opiniones.
 - [x] Backend NestJS con búsqueda de lugares y búsqueda inteligente con Gemini/fallback local.
 - [x] Esquema original de TurisMatch conservado; `/sitios` es el único recurso público de destinos y `vista_lugares_backend` adapta sus datos para la búsqueda.
@@ -21,8 +22,8 @@ Aplicación web para explorar sitios turísticos de Colombia mediante filtros y 
 
 ### Falta ejecutar o completar
 
-- [x] Aplicar/verificar el script [turisMatch.sql](./turisMatch.sql) en la instancia MySQL local.
-- [ ] Configurar `backend/.env` con conexión MySQL y `SESSION_SECRET` para un despliegue real.
+- [x] Aplicar/verificar el script [turisMatch.sql](./back/turisMatch.sql) en la instancia MySQL local.
+- [ ] Configurar `back/.env` con conexión MySQL y `SESSION_SECRET` para un despliegue real.
 - [x] Crear una cuenta turista y una administradora de demostración en MySQL local.
 - [x] Probar endpoints de categorías y sitios contra MySQL local.
 - [x] Crear y verificar datos de demostración relacionados para planes, calificaciones, favoritos y preferencias personales.
@@ -34,28 +35,63 @@ Aplicación web para explorar sitios turísticos de Colombia mediante filtros y 
 ## Estructura principal
 
 ```text
-backend/src/
-├── ai/               # Interpretación de consultas
-├── auth/             # Registro, login, cierre y protección de sesión
-├── calificaciones/  # Reseñas y puntuaciones
-├── categorias/       # Catálogo de categorías
-├── common/           # Tipos, validaciones y permisos compartidos
-├── database/entities/ # Entidades TypeORM
-├── favoritos/        # Favoritos por usuario
-├── lugares/          # Modelo/vista de lectura para búsqueda interna (sin rutas públicas)
-├── planes/           # Planes y precios
-├── preferencias/     # Catálogo y preferencias personales
-├── sitios/           # Sitios turísticos y detalle completo
-└── usuarios/         # Perfil y administración de usuarios
+front/
+├── public/
+├── src/                 # Aplicación React + TypeScript
+├── package.json         # Dependencias y scripts del frontend
+└── vite.config.ts
+
+back/
+├── src/
+│   ├── ai/               # Interpretación de consultas
+│   ├── auth/             # Registro, login, cierre y protección de sesión
+│   ├── calificaciones/   # Reseñas y puntuaciones
+│   ├── categorias/       # Catálogo de categorías
+│   ├── common/           # Tipos, validaciones y permisos compartidos
+│   ├── database/entities/ # Entidades TypeORM
+│   ├── favoritos/        # Favoritos por usuario
+│   ├── lugares/          # Modelo/vista de lectura para búsqueda interna
+│   ├── planes/           # Planes y precios
+│   ├── preferencias/     # Catálogo y preferencias personales
+│   ├── sitios/           # Sitios turísticos y detalle completo
+│   └── usuarios/         # Perfil y administración de usuarios
+├── package.json
+├── package-lock.json
+├── turisMatch.sql        # Esquema de la base de datos
+└── turismo-ia.http       # Solicitudes para probar la API
 ```
 
 ## Requisitos y ejecución local
 
 - Node.js compatible con las versiones de dependencias del proyecto.
 - MySQL/MariaDB y la base `turismo_ia`.
-- Clave opcional `GEMINI_API_KEY` en `backend/.env`; las llamadas a Gemini tienen un límite de 5 segundos y no se reintentan, tras el cual la búsqueda usa reglas locales. Si falta la clave, se usan las reglas locales directamente. `VITE_API_URL` puede definir el origen del backend (por defecto `http://localhost:3000`). No publiques secretos.
+- No subas `.env` ni claves al repositorio. Usa [front/.env.example](./front/.env.example) y [back/.env.example](./back/.env.example) como plantillas para tu configuración local.
+
+## Ejecutar en desarrollo
+
+Abre una terminal para cada aplicación desde la raíz:
+
+```powershell
+cd front
+Copy-Item .env.example .env
+npm ci
+npm run dev
+```
+
+```powershell
+cd back
+Copy-Item .env.example .env
+npm ci
+npm run start:dev
+```
+
+La API queda en `http://localhost:3000` y Vite en `http://localhost:5173`. MySQL/MariaDB debe estar activo antes de iniciar el backend. La clave `GEMINI_API_KEY` es opcional; Gemini tiene un timeout de 5 segundos sin reintentos y luego se usa búsqueda por reglas locales.
+
+En `front/.env`, configura `VITE_GOOGLE_MAPS_API_KEY` solo si necesitas el mapa. Al ser una clave usada en el navegador, restríngele los dominios autorizados y las APIs permitidas desde Google Cloud.
 
 ## Base de datos
+
+Importa `back/turisMatch.sql` en MySQL/MariaDB. El script crea la base `turismo_ia` si todavía no existe.
 
 El script conserva las tablas originales `categoria`, `sitioturistico`, `usuario`, `calificacion`, `favorito`, `plan`, `preferencia` y `usuariopreferencia`. Agrega `latitud` y `longitud` opcionales cuando no existan y crea la vista `vista_lugares_backend`. Sitios turísticos y lugares no son dos conjuntos separados: `/sitios` es el recurso canónico, y la vista solo adapta los mismos registros para ofrecer campos calculados como precio mínimo y promedio de calificaciones.
 
@@ -69,11 +105,12 @@ Los planes usan precios técnicos de prueba y no son ofertas comerciales. Las de
 
 ## Configuración del backend
 
-Valores locales predeterminados: `DB_HOST=localhost`, `DB_PORT=3306`, `DB_USERNAME=root`, `DB_PASSWORD=` y `DB_DATABASE=turismo_ia`. Se pueden sobrescribir en `backend/.env`. `FRONTEND_ORIGIN` define el origen permitido para CORS (por defecto `http://localhost:5173`).
+Valores locales predeterminados: `DB_HOST=localhost`, `DB_PORT=3306`, `DB_USERNAME=root`, `DB_PASSWORD=` y `DB_DATABASE=turismo_ia`. Se pueden sobrescribir en `back/.env`. `FRONTEND_ORIGIN` define el origen permitido para CORS (por defecto `http://localhost:5173`).
 
 En producción configura un `SESSION_SECRET` fuerte mediante el entorno; el backend se niega a iniciar en producción si falta. No uses MemoryStore en producción.
 
 ## Documentación
 
 - [API.md](./API.md): rutas, permisos, ejemplos de solicitudes y autenticación.
-- [turisMatch.sql](./turisMatch.sql): estructura MySQL conservando el modelo original.
+- [back/turisMatch.sql](./back/turisMatch.sql): estructura MySQL conservando el modelo original.
+- [back/turismo-ia.http](./back/turismo-ia.http): solicitudes de ejemplo para probar las rutas del API.

@@ -1,0 +1,260 @@
+@baseUrl = http://localhost:3000
+@json = application/json
+@sitioId = 1
+@categoriaId = 1
+@planId = 1
+@preferenciaId = 1
+@calificacionId = 1
+@idSitioFavorito = 1
+
+### ============================================================
+### AUTENTICACION
+### Registro de turista (la contraseña debe tener letras y números)
+POST {{baseUrl}}/auth/registro
+Content-Type: {{json}}
+
+{
+  "identificacion": "123456789",
+  "tipoDoc": "CC",
+  "nombres": "Ana",
+  "apellidos": "Perez",
+  "correo": "ana@example.com",
+  "fechaNacimiento": "2000-01-15",
+  "contrasena": "ClaveSegura2026"
+}
+
+### Login (la cookie de sesión se guarda en el cliente HTTP)
+POST {{baseUrl}}/auth/login
+Content-Type: {{json}}
+
+{
+  "correo": "ana@example.com",
+  "contrasena": "ClaveSegura2026"
+}
+
+### Consultar sesión actual (requiere login)
+GET {{baseUrl}}/auth/sesion
+
+### Logout
+POST {{baseUrl}}/auth/logout
+
+### ============================================================
+### USUARIOS
+### Ver mi perfil (requiere login)
+GET {{baseUrl}}/usuarios/me
+
+### Actualizar mi perfil (requiere login)
+PATCH {{baseUrl}}/usuarios/me
+Content-Type: {{json}}
+
+{
+  "nombres": "Ana Maria",
+  "apellidos": "Perez",
+  "correo": "ana@example.com",
+  "fechaNacimiento": "2000-01-15"
+}
+
+### Cambiar contraseña (requiere login)
+PATCH {{baseUrl}}/usuarios/me
+Content-Type: {{json}}
+
+{
+  "contrasena": "OtraClaveSegura2026"
+}
+
+### Listar usuarios (requiere rol administrador)
+GET {{baseUrl}}/usuarios
+
+### ============================================================
+### BUSQUEDA CON IA
+### Búsqueda con IA (Gemini o reglas locales)
+POST {{baseUrl}}/ai/search
+Content-Type: {{json}}
+
+{
+  "query": "Lugares para visitar en tunja"
+}
+
+### ============================================================
+### SITIOS TURISTICOS
+### Listar sitios (respuesta con precio y calificación calculados)
+GET {{baseUrl}}/sitios
+
+### Buscar sitios por ciudad
+GET {{baseUrl}}/sitios/buscar?ciudad=Bogot%C3%A1
+
+### Filtrar sitios por ciudad, categoría, calificación mínima y precio máximo
+GET {{baseUrl}}/sitios/filtrar?ciudad=Bogot%C3%A1&categoria=Museo&calificacionMinima=4&precioMaximo=20000
+
+### Filtrar sitios por ciudad y categoría
+GET {{baseUrl}}/sitios?ciudad=Bogot%C3%A1&categoriaId={{categoriaId}}
+
+### Consultar detalle con categoría, planes y promedio de calificaciones
+GET {{baseUrl}}/sitios/{{sitioId}}
+
+### Crear sitio (requiere rol administrador)
+POST {{baseUrl}}/sitios
+Content-Type: {{json}}
+
+{
+  "nombre": "Museo de ejemplo",
+  "descripcion": "Descripción del sitio turístico",
+  "ubicacion": "Carrera 1 # 2-3",
+  "ciudad": "Bogotá",
+  "imagen": null,
+  "horario": "Martes a domingo",
+  "idCategoria": {{categoriaId}},
+  "latitud": 4.6,
+  "longitud": -74.0
+}
+
+### Actualizar sitio (requiere rol administrador)
+PATCH {{baseUrl}}/sitios/{{sitioId}}
+Content-Type: {{json}}
+
+{
+  "descripcion": "Descripción actualizada",
+  "horario": "Lunes a sábado",
+  "latitud": 4.601,
+  "longitud": -74.072
+}
+
+### Eliminar sitio (requiere rol administrador; falla si tiene planes, calificaciones o favoritos)
+DELETE {{baseUrl}}/sitios/{{sitioId}}
+
+### ============================================================
+### CATEGORIAS
+### Listar categorías
+GET {{baseUrl}}/categorias
+
+### Consultar categoría
+GET {{baseUrl}}/categorias/{{categoriaId}}
+
+### Crear categoría (requiere rol administrador)
+POST {{baseUrl}}/categorias
+Content-Type: {{json}}
+
+{
+  "nombre": "Naturaleza",
+  "descripcion": "Parques, montañas y paisajes"
+}
+
+### Actualizar categoría (requiere rol administrador)
+PATCH {{baseUrl}}/categorias/{{categoriaId}}
+Content-Type: {{json}}
+
+{
+  "nombre": "Museos",
+  "descripcion": "Museos y espacios de exposición"
+}
+
+### Eliminar categoría (requiere rol administrador; falla si tiene sitios asociados)
+DELETE {{baseUrl}}/categorias/{{categoriaId}}
+
+### ============================================================
+### PLANES
+### Listar planes
+GET {{baseUrl}}/planes
+
+### Listar planes de un sitio
+GET {{baseUrl}}/planes?idSitio={{sitioId}}
+
+### Consultar plan
+GET {{baseUrl}}/planes/{{planId}}
+
+### Crear plan (requiere rol administrador)
+POST {{baseUrl}}/planes
+Content-Type: {{json}}
+
+{
+  "nombre": "Entrada general",
+  "descripcion": "Acceso al sitio",
+  "precio": 15000,
+  "duracion": "2 horas",
+  "cupo": 20,
+  "idSitio": {{sitioId}}
+}
+
+### Actualizar plan (requiere rol administrador)
+PATCH {{baseUrl}}/planes/{{planId}}
+Content-Type: {{json}}
+
+{
+  "nombre": "Entrada general actualizada",
+  "precio": 18000,
+  "cupo": 25
+}
+
+### Eliminar plan (requiere rol administrador)
+DELETE {{baseUrl}}/planes/{{planId}}
+
+### ============================================================
+### CALIFICACIONES Y COMENTARIOS
+### Listar calificaciones de un sitio
+GET {{baseUrl}}/sitios/{{sitioId}}/calificaciones
+
+### Crear calificación (requiere login)
+POST {{baseUrl}}/sitios/{{sitioId}}/calificaciones
+Content-Type: {{json}}
+
+{
+  "puntuacion": 5,
+  "comentario": "Excelente lugar."
+}
+
+### Eliminar calificación propia o como administrador (requiere login)
+DELETE {{baseUrl}}/calificaciones/{{calificacionId}}
+
+### ============================================================
+### FAVORITOS (requiere login en todos los métodos)
+### Listar mis favoritos
+GET {{baseUrl}}/favoritos
+
+### Agregar un sitio a mis favoritos
+POST {{baseUrl}}/favoritos/{{idSitioFavorito}}
+
+### Quitar un sitio de mis favoritos
+DELETE {{baseUrl}}/favoritos/{{idSitioFavorito}}
+
+### ============================================================
+### PREFERENCIAS
+### Listar catálogo de preferencias
+GET {{baseUrl}}/preferencias
+
+### Consultar preferencia del catálogo
+GET {{baseUrl}}/preferencias/{{preferenciaId}}
+
+### Crear preferencia del catálogo (requiere rol administrador)
+POST {{baseUrl}}/preferencias
+Content-Type: {{json}}
+
+{
+  "nombre": "Aventura",
+  "descripcion": "Actividades de aventura y naturaleza"
+}
+
+### Actualizar preferencia del catálogo (requiere rol administrador)
+PATCH {{baseUrl}}/preferencias/{{preferenciaId}}
+Content-Type: {{json}}
+
+{
+  "nombre": "Aventura y deportes",
+  "descripcion": "Actividades al aire libre"
+}
+
+### Eliminar preferencia del catálogo (requiere rol administrador)
+DELETE {{baseUrl}}/preferencias/{{preferenciaId}}
+
+### Listar mis preferencias (requiere login)
+GET {{baseUrl}}/preferencias/me
+
+### Agregar o actualizar una preferencia personal (requiere login)
+POST {{baseUrl}}/preferencias/me/{{preferenciaId}}
+Content-Type: {{json}}
+
+{
+  "nivelInteres": 4
+}
+
+### Quitar una preferencia personal (requiere login)
+DELETE {{baseUrl}}/preferencias/me/{{preferenciaId}}

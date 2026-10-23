@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   NotFoundException,
+  Post,
   Patch,
   Param,
   Query,
@@ -36,11 +37,33 @@ export class UsuariosController {
     );
   }
 
+  @Post()
+  @UseGuards(RolesGuard)
+  @Roles('administrador')
+  create(@Body() body: unknown) {
+    return this.authService.createManagedUser(body);
+  }
+
   @Get()
   @UseGuards(RolesGuard)
   @Roles('administrador')
   list(@Query('busqueda') search?: string) {
     return this.authService.listUsers(search);
+  }
+
+  @Patch(':identificacion')
+  @UseGuards(RolesGuard)
+  @Roles('administrador')
+  update(
+    @Param('identificacion') identificacion: string,
+    @Body() body: unknown,
+    @Req() request: SolicitudAutenticada,
+  ) {
+    return this.authService.updateManagedUser(
+      identificacion,
+      body,
+      request.usuario.identificacion,
+    );
   }
 
   @Get(':identificacion')

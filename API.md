@@ -6,7 +6,7 @@ Base local: `http://localhost:3000`. El frontend está en `http://localhost:5173
 
 - **Público:** búsqueda, consulta de sitios/categorías/planes, listado de calificaciones y catálogo de preferencias.
 - **Con sesión:** perfil propio, favoritos, preferencias propias y publicar calificaciones.
-- **Administrador:** crear/editar/eliminar sitios, categorías, planes y preferencias; listar usuarios. El alta pública siempre asigna rol `turista`.
+- **Administrador:** crear/editar/eliminar sitios, categorías, planes y preferencias; listar usuarios y crear cuentas de turista o administrador. El alta pública siempre asigna rol `turista`.
 - Las sesiones usan `express-session`, cookie `turismo_sid` HttpOnly y 30 minutos de expiración por inactividad. En desarrollo se usa MemoryStore; reiniciar el backend invalida las sesiones. No usar MemoryStore en producción.
 - Las llamadas del navegador que usan sesión deben enviar `credentials: "include"`. CORS debe tener `credentials: true` y un origen concreto.
 
@@ -20,6 +20,8 @@ Base local: `http://localhost:3000`. El frontend está en `http://localhost:5173
 | `GET` | `/auth/sesion` | Sesión | Validar sesión y devolver usuario |
 | `GET` | `/usuarios/me` | Sesión | Consultar perfil propio |
 | `PATCH` | `/usuarios/me` | Sesión | Modificar datos propios |
+| `POST` | `/usuarios` | Administrador | Crear un turista o administrador indicando el rol |
+| `PATCH` | `/usuarios/:identificacion` | Administrador | Editar datos, rol o restablecer la contraseña de una cuenta |
 | `GET` | `/usuarios` | Administrador | Listar usuarios sin devolver hashes |
 
 ### Registro
@@ -39,6 +41,27 @@ Base local: `http://localhost:3000`. El frontend está en `http://localhost:5173
 ```
 
 La contraseña debe tener entre 8 y 128 caracteres e incluir al menos una letra y un número. Se almacena con scrypt; el cliente no puede asignar roles. El rol inicial es `turista`.
+
+### Crear una cuenta desde administración
+
+`POST /usuarios` requiere una sesión con rol `administrador`. Acepta los mismos datos personales y requisitos de contraseña que el registro público, más el rol elegido:
+
+```json
+{
+  "identificacion": "987654321",
+  "tipoDoc": "CC",
+  "nombres": "Carlos",
+  "apellidos": "Gómez",
+  "correo": "carlos@example.com",
+  "fechaNacimiento": "1992-08-20",
+  "contrasena": "ClaveSegura2026",
+  "rol": "turista"
+}
+```
+
+El rol solo se acepta en esta ruta administrativa. El registro público de `/auth/registro` siempre crea turistas.
+
+Los administradores también pueden actualizar el tipo de documento, nombres, apellidos, correo, fecha de nacimiento y rol mediante `PATCH /usuarios/:identificacion`. Se puede restablecer la contraseña enviando `contrasena`; omitirla conserva la contraseña actual. No se puede cambiar la identificación ni quitar el rol de administrador a la propia cuenta.
 
 ### Login
 
@@ -62,7 +85,7 @@ fetch("http://localhost:3000/auth/login", {
 });
 ```
 
-Para cerrar sesión: `POST /auth/logout`. Para cambiar la contraseña mediante `PATCH /usuarios/me`, envía solo los campos que quieras actualizar; no están permitidos `identificacion` ni `rol`.
+Para actualizar los nombres, apellidos o correo propio, envía esos campos a `PATCH /usuarios/me`. La contraseña es opcional; para cambiarla, incluye `contrasenaActual` y `contrasena` con la clave nueva. El backend verifica la clave actual antes de guardar. No están permitidos `identificacion` ni `rol`.
 
 ### Consultas administrativas de usuarios
 
@@ -226,4 +249,4 @@ No se ofrece una API pública para asignar el rol administrador.
 
 ## Configuración
 
-En `backend/.env` pueden configurarse `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE`, `FRONTEND_ORIGIN` y `SESSION_SECRET`. En producción `SESSION_SECRET` es obligatorio. Configura HTTPS y reemplaza el MemoryStore por un almacén persistente antes de desplegar.
+En `back/.env` pueden configurarse `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE`, `FRONTEND_ORIGIN`, `SESSION_SECRET` y `GEMINI_API_KEY`. En producción `SESSION_SECRET` es obligatorio. Configura HTTPS y reemplaza el MemoryStore por un almacén persistente antes de desplegar. Usa `back/.env.example` como plantilla; no publiques claves ni secretos.

@@ -134,6 +134,21 @@ button {
   background: #d8eee5;
 }
 
+.account-link {
+  padding: 8px 2px;
+  border: 0;
+  background: transparent;
+  color: #52616b;
+  font-size: clamp(10px, calc(10px + 0.18vw), 13px);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.account-link:hover,
+.account-link[aria-current="page"] {
+  color: var(--green);
+}
+
 .account-avatar {
   display: grid;
   width: 34px;
@@ -933,6 +948,69 @@ button {
 
 .personal-page .empty-state {
   margin-top: 30px;
+}
+
+.account-page {
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.profile-form {
+  display: grid;
+  max-width: 820px;
+  gap: 18px;
+}
+
+.profile-form-section {
+  padding: 22px;
+  border: 1px solid #e4ebe7;
+  border-radius: 13px;
+  background: white;
+  box-shadow: 0 3px 12px #263c300a;
+}
+
+.profile-form-section h2 {
+  margin: 0 0 16px;
+  color: #263c31;
+  font-size: 17px;
+}
+
+.profile-form-section > p {
+  margin: -8px 0 16px;
+  color: #718078;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.profile-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+}
+
+.profile-field-wide {
+  grid-column: 1 / -1;
+}
+
+.profile-password-hint {
+  margin: 13px 0 0 !important;
+  font-size: 11px !important;
+}
+
+.profile-form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.profile-form-actions .primary-button {
+  min-height: 42px;
+  padding: 0 18px;
+  border: 0;
+}
+
+.profile-form-actions .primary-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 .recommendation-interests {
@@ -1813,6 +1891,14 @@ button {
   gap: 8px;
 }
 
+.admin-user-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .admin-user-search-button,
 .admin-view-user {
   min-height: 34px;
@@ -2066,6 +2152,13 @@ button {
   margin: 14px 0 0;
 }
 
+.admin-user-form-note {
+  margin: 14px 0 0;
+  color: #68766e;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .admin-user-detail dl {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2208,6 +2301,14 @@ button {
 
   .account-menu {
     gap: 6px;
+  }
+
+  .account-name {
+    display: none;
+  }
+
+  .account-link {
+    font-size: 10px;
   }
 
   .account-avatar {
@@ -2370,6 +2471,19 @@ button {
     padding: 42px 18px 60px;
   }
 
+  .profile-form-section {
+    padding: 17px;
+  }
+
+  .profile-form-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .profile-field-wide {
+    grid-column: auto;
+  }
+
   .recommendation-page {
     padding-bottom: 16px;
   }
@@ -2481,6 +2595,14 @@ button {
   .admin-card-heading > .admin-create-button,
   .admin-card-heading > .admin-search,
   .admin-user-search-form {
+    width: 100%;
+  }
+
+  .admin-user-actions {
+    width: 100%;
+  }
+
+  .admin-user-actions > .admin-create-button {
     width: 100%;
   }
 
